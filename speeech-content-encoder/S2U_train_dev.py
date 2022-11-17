@@ -1,15 +1,25 @@
-import numpy as np
+"""
+
+"""
+# TODO: add function for main
+
 import joblib
-import torch
-import torchaudio 
+import os
+
+import numpy as np
 import pandas as pd
-from tqdm import tqdm
-import os 
 import torch
+import torchaudio
+from tqdm import tqdm
 
 SAMPLE_RATE = 16000
 CHUNK_LENGTH = 250000
+
+
 class ApplyKmeans(object):
+    """
+    """
+
     def __init__(self, km_path, return_diff=False):
         self.km_model = joblib.load(km_path)
         self.C_np = self.km_model.cluster_centers_.transpose()
@@ -44,76 +54,95 @@ class ApplyKmeans(object):
             else:
                 return np.argmin(dist, axis=1)
 
+
 def reader(fname):
+    """
+    Args:
+        fname:
+
+    Returns:
+
+    """
     wav, ori_sr = torchaudio.load(fname)
     if ori_sr != SAMPLE_RATE:
         wav = torchaudio.transforms.Resample(ori_sr, SAMPLE_RATE)(wav)
     return wav.squeeze()
 
 
-# train
-df = pd.read_csv('/home/daniel094144/E2E-SpokenQA/meta-train.csv')
-audio_file_dir = '/home/daniel094144/E2E-SpokenQA/train_audios/'
+# TODO: Get these from params
 
-output_dir = '/home/daniel094144/data/SQA_code/hubert_large_128/train_code'
-extractor = torch.hub.load('s3prl/s3prl', 'hubert_large_ll60k')    
+# train
+# df = pd.read_csv('/home/daniel094144/E2E-SpokenQA/meta-train.csv')
+# audio_file_dir = '/home/daniel094144/E2E-SpokenQA/train_audios/'
+
+# output_dir = '/home/daniel094144/data/SQA_code/hubert_large_128/train_code'
+df = pd.read_csv("data_dir/train/meta-train.csv")
+audio_file_dir = "data_dir//train/train_audios"
+
+output_dir = "data_dir/train/train_code/"
+
+extractor = torch.hub.load('s3prl/s3prl', 'hubert_large_ll60k')
 extractor.eval()
 if torch.cuda.is_available():
     extractor = extractor.cuda()
-apply_kmeans = ApplyKmeans('/home/daniel094144/Daniel/DUAL-textless-SQA/hubert-cluster-code/km_100h_c128/km_feat_layer_22')
-
+# apply_kmeans = ApplyKmeans(
+# '/home/daniel094144/Daniel/DUAL-textless-SQA/hubert-cluster-code/km_100h_c128/km_feat_layer_22'
+# )
+apply_kmeans = ApplyKmeans('/km_100h_c128/km_feat_layer_22')
 
 for file in tqdm(df['id'].values, desc='transforming passage to discrete code'):
-    audio_file = os.path.join(audio_file_dir, file+'.mp3')
+    audio_file = os.path.join(audio_file_dir, file + '.mp3')
     wavs = reader(audio_file)
 
-    if len(wavs) > 20 * SAMPLE_RATE: 
+    if len(wavs) > 20 * SAMPLE_RATE:
         continue
-    
-    wavs = wavs.cuda()    
-    feature = extractor([wavs])    
 
-    
+    wavs = wavs.cuda()
+    feature = extractor([wavs])
+
     code = apply_kmeans(feature['hidden_state_22'].squeeze().cuda())
     code = torch.tensor(code)
 
     merged_code, counts = torch.unique_consecutive(code, return_counts=True)
-    np.savetxt(os.path.join(output_dir, file+'.code'), merged_code.long(), fmt='%i')    
-    np.savetxt(os.path.join(output_dir, file+'.cnt'), counts.long(), fmt='%i')
+    np.savetxt(os.path.join(output_dir, file + '.code'), merged_code.long(), fmt='%i')
+    np.savetxt(os.path.join(output_dir, file + '.cnt'), counts.long(), fmt='%i')
 
 # dev
-df = pd.read_csv('/home/daniel094144/E2E-SpokenQA/meta-dev.csv')
-audio_file_dir = '/home/daniel094144/E2E-SpokenQA/dev_audios/'
+# df = pd.read_csv('/home/daniel094144/E2E-SpokenQA/meta-dev.csv')
+# audio_file_dir = '/home/daniel094144/E2E-SpokenQA/dev_audios/'
+# output_dir = '/home/daniel094144/data/SQA_code/hubert_large_128/dev_code'
 
-output_dir = '/home/daniel094144/data/SQA_code/hubert_large_128/dev_code'
+df = pd.read_csv("data_dir/dev/meta-dev.csv")
+audio_file_dir = "data_dir/dev/dev_audios"
 
+output_dir = "data_dir/dev/dev_code/"
 
 for file in tqdm(df['id'].values, desc='transforming passage to discrete code'):
-    audio_file = os.path.join(audio_file_dir, file+'.mp3')
+    audio_file = os.path.join(audio_file_dir, file + '.mp3')
     wavs = reader(audio_file)
-    wavs = wavs.cuda()   
+    wavs = wavs.cuda()
 
-    if len(wavs) > 20 * SAMPLE_RATE: 
+    if len(wavs) > 20 * SAMPLE_RATE:
         print(f'{file} too long')
-        chunks = torch.split(wavs, CHUNK_LENGTH) 
-        for i, chunk in enumerate(chunks): 
+        chunks = torch.split(wavs, CHUNK_LENGTH)
+        for i, chunk in enumerate(chunks):
             feat = extractor([chunk])
             feat = feat['hidden_state_22'].squeeze()
-            
+
             if i == 0:
                 feature = feat
-            else: 
-                feature = torch.cat([feature, feat], dim = 0)
+            else:
+                feature = torch.cat([feature, feat], dim=0)
 
         code = apply_kmeans(feature.cuda())
 
     else:
-        feature = extractor([wavs])    
+        feature = extractor([wavs])
 
         code = apply_kmeans(feature['hidden_state_22'].squeeze().cuda())
 
     code = torch.tensor(code)
 
     merged_code, counts = torch.unique_consecutive(code, return_counts=True)
-    np.savetxt(os.path.join(output_dir, file+'.code'), merged_code.long(), fmt='%i')    
-    np.savetxt(os.path.join(output_dir, file+'.cnt'), counts.long(), fmt='%i')
+    np.savetxt(os.path.join(output_dir, file + '.code'), merged_code.long(), fmt='%i')
+    np.savetxt(os.path.join(output_dir, file + '.cnt'), counts.long(), fmt='%i')
