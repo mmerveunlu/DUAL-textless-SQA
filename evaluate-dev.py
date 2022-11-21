@@ -126,7 +126,7 @@ class SQADevDataset(Dataset):
             data_dir:
         """
         df = pd.read_csv(os.path.join(data_dir, 'dev_code_answer.csv'))
-        with open(os.path.join(data_dir, 'dev-hash2question.json')) as f:
+        with open(os.path.join(data_dir, 'dataset/NMSQA/dev-hash2question.json')) as f:
             h2q = json.load(f)
 
         df['question'] = df['hash'].apply(lambda x: h2q[x])
@@ -243,7 +243,7 @@ dataloader = DataLoader(valid_dataset, batch_size=batch_size, collate_fn=collate
 
 df = pd.read_csv(os.path.join(data_dir, 'dev_code_answer.csv'))
 
-with open(os.path.join(data_dir, 'dev-hash2question.json'), 'r') as f:
+with open(os.path.join(data_dir, 'dataset/NMSQA/dev-hash2question.json'), 'r') as f:
     h2q = json.load(f)
 df['question'] = df['hash'].apply(lambda x: h2q[x])
 # different answer annotators 

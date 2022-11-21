@@ -1,10 +1,13 @@
-# +
-import pandas as pd
-import numpy as np
+"""
+
+"""
 import os
-import math
+
+import numpy as np
+import pandas as pd
 from tqdm import tqdm
 
+# TODO: get these from params
 data_name = 'hubert_large_23_128'
 
 file_dir = '/home/daniel094144/data_folder/SQA_code/'+data_name+'/train_code'
@@ -17,8 +20,8 @@ code_start = []
 code_end = []
 
 for start_sec, end_sec, context_id in tqdm(zip(start, end, passage)):
-#     context_code = np.loadtxt(os.path.join(file_dir, context_id+'.code'))
-#     context_cnt = np.loadtxt(os.path.join(file_dir, context_id+'.cnt'))
+    # context_code = np.loadtxt(os.path.join(file_dir, context_id+'.code'))
+    # context_cnt = np.loadtxt(os.path.join(file_dir, context_id+'.cnt'))
     context_code = np.loadtxt(os.path.join(file_dir, 'context-'+context_id+'.code'))
     context_cnt = np.loadtxt(os.path.join(file_dir, 'context-'+context_id+'.cnt'))
     start_ind = start_sec / 0.02
