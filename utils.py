@@ -3,11 +3,20 @@
 import re
 from builtins import str as unicode
 
+
 def text_preprocess(text):
+    """
+    normalizes the given text
+    :param text,str
+    Returns
+      str, normalized text
+    Ex:
+     text = "s= "It is a replica of the grotto at Lourdes in 1858."
+     text_preprocess(s)
+      >> "it is a replica of the grotto at lourdes in eighteen fifty eight"
+    """
     text = unicode(text)
-    
     text = normalize_numbers(text)
-    
     text = text.lower()
     text = text.replace("i.e.", "that is")
     text = text.replace("e.g.", "for example")
@@ -16,6 +25,7 @@ def text_preprocess(text):
     text = re.sub("[^ a-z]", "", text)
 
     return text
+
 
 # from g2p-en/expand.py
 import inflect
@@ -42,7 +52,7 @@ def _expand_dollars(m):
     match = m.group(1)
     parts = match.split('.')
     if len(parts) > 2:
-        return match + ' dollars'    # Unexpected format
+        return match + ' dollars'  # Unexpected format
     dollars = int(parts[0]) if parts[0] else 0
     cents = int(parts[1]) if len(parts) > 1 and parts[1] else 0
     if dollars and cents:
@@ -65,10 +75,10 @@ def _expand_ordinal(m):
 
 def _expand_number(m):
     num = int(m.group(0))
-    if num > 1000 and num < 3000:
+    if 1000 < num < 3000:
         if num == 2000:
             return 'two thousand'
-        elif num > 2000 and num < 2010:
+        elif 2000 < num < 2010:
             return 'two thousand ' + _inflect.number_to_words(num % 100)
         elif num % 100 == 0:
             return _inflect.number_to_words(num // 100) + ' hundred'
@@ -91,8 +101,10 @@ def normalize_numbers(text):
 '''
 metric calculation
 '''
+
+
 def compare(pred_start, pred_end, gold_start, gold_end):
-    if pred_start >= pred_end: 
+    if pred_start >= pred_end:
         overlap_start = 0
         overlap_end = 0
         Max = 0
@@ -104,80 +116,83 @@ def compare(pred_start, pred_end, gold_start, gold_end):
         Max = 0
         Min = 0
         no_overlap = True
-    elif gold_end == gold_start: 
+    elif gold_end == gold_start:
         overlap_start = 0
         overlap_end = 0
         Max = 0
         Min = 0
-        no_overlap = True    
+        no_overlap = True
     else:
         no_overlap = False
         if pred_start <= gold_start:
             Min = pred_start
             overlap_start = gold_start
-        else: 
+        else:
             Min = gold_start
             overlap_start = pred_start
 
         if pred_end <= gold_end:
             Max = gold_end
             overlap_end = pred_end
-        else: 
+        else:
             Max = pred_end
             overlap_end = gold_end
-        
+
     return overlap_start, overlap_end, Min, Max, no_overlap
+
 
 def Frame_F1_scores(pred_starts, pred_ends, gold_starts, gold_ends):
     F1s = []
     for pred_start, pred_end, gold_start, gold_end in zip(pred_starts, pred_ends, gold_starts, gold_ends):
         overlap_start, overlap_end, Min, Max, no_overlap = compare(pred_start, pred_end, gold_start, gold_end)
-        if no_overlap: 
+        if no_overlap:
             if pred_start == gold_start and pred_end == gold_end:
                 F1 = 1
-            else: 
+            else:
                 F1 = 0
-        else: 
+        else:
             Precision = (overlap_end - overlap_start) / (pred_end - pred_start)
             Recall = (overlap_end - overlap_start) / (gold_end - gold_start)
             F1 = float(2 * Precision * Recall / (Precision + Recall))
         F1s.append(F1)
     return F1s
 
+
 def Frame_F1_score(pred_start, pred_end, gold_start, gold_end):
     overlap_start, overlap_end, Min, Max, no_overlap = compare(pred_start, pred_end, gold_start, gold_end)
-    if no_overlap: 
+    if no_overlap:
         if pred_start == gold_start and pred_end == gold_end:
             F1 = 1
-        else: 
+        else:
             F1 = 0
-    else: 
+    else:
         Precision = (overlap_end - overlap_start) / (pred_end - pred_start)
         Recall = (overlap_end - overlap_start) / (gold_end - gold_start)
         F1 = 2 * Precision * Recall / (Precision + Recall)
     return F1
+
 
 def AOS_scores(pred_starts, pred_ends, gold_starts, gold_ends):
     AOSs = []
     for pred_start, pred_end, gold_start, gold_end in zip(pred_starts, pred_ends, gold_starts, gold_ends):
         overlap_start, overlap_end, Min, Max, no_overlap = compare(pred_start, pred_end, gold_start, gold_end)
 
-        if no_overlap: 
+        if no_overlap:
             AOS = 0
-        else: 
+        else:
             AOS = float((overlap_end - overlap_start) / (Max - Min))
         AOSs.append(AOS)
     return AOSs
 
+
 def AOS_score(pred_start, pred_end, gold_start, gold_end):
     overlap_start, overlap_end, Min, Max, no_overlap = compare(pred_start, pred_end, gold_start, gold_end)
 
-    if no_overlap: 
+    if no_overlap:
         AOS = 0
-    else: 
+    else:
         AOS = (overlap_end - overlap_start) / (Max - Min)
     return AOS
-        
 
 
 def aggregate_dev_result(dup, metric):
@@ -187,15 +202,16 @@ def aggregate_dev_result(dup, metric):
         if not dup[i]:
             if len(buff) == 0:
                 aggregate_result.append(metric[i])
-            else: 
+            else:
                 aggregate_result.append(max(buff))
 
             buff = []  # clear buffer
 
-        else: 
+        else:
             buff.append(metric[i])
-    
+
     return sum(aggregate_result) / len(aggregate_result)
+
 
 def calc_overlap(pred_starts, pred_ends, gold_starts, gold_ends):
     x = [pred_starts, pred_ends]
