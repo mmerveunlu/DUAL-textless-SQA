@@ -62,6 +62,7 @@ def preprocess_data_from_tsv(text_file, audio_dir):
         dt.drop(columns=['Unnamed: 0'], inplace=True)
     if 'path' in dt:
         dt.drop(columns=['path'], inplace=True)
+    dt = dt.sort_values(by=['id'])
     return dt
 
 
@@ -69,7 +70,7 @@ def save_meta_csv(dt, out_file):
     """
     saves the given dt into a file
     """
-    dt.to_csv(out_file, sep="\t", header=True, index=False)
+    dt.to_csv(out_file, sep=",", header=True, index=False)
 
 
 def parse_args():
