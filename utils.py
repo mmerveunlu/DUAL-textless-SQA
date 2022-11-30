@@ -1,7 +1,8 @@
-# -*- coding: utf-8 -*-
-# +
-import re
 from builtins import str as unicode
+# from g2p-en/expand.py
+import re
+
+import inflect
 
 
 def text_preprocess(text):
@@ -26,10 +27,6 @@ def text_preprocess(text):
 
     return text
 
-
-# from g2p-en/expand.py
-import inflect
-import re
 
 _inflect = inflect.engine()
 _comma_number_re = re.compile(r'([0-9][0-9\,]+[0-9])')
