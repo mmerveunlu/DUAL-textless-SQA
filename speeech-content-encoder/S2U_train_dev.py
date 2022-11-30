@@ -12,8 +12,12 @@ Args:
     audio_type: str, the extension of audio files as .mp3, .wav
 
 Usage:
- >
-
+ > python S2U_train_dev.py --part train \
+                           --hubert hubert_large_ll60k \
+                           --kmeans km_100h_c128/km_feat_layer_22 \
+                           --meta meta-train.csv --audios audios \
+                           --output train_code \
+                           --audio_type mp3
 """
 import argparse
 import joblib
@@ -30,7 +34,7 @@ SAMPLE_RATE = 16000
 CHUNK_LENGTH = 250000
 
 FORMAT = "%(asctime)s - %(name)s - %(levelname)s -[%(filename)s:%(lineno)s - %(funcName)20s() ]- %(message)s"
-logging.basicConfig(filename='log/data.log',
+logging.basicConfig(filename='../log/data.log',
                     level=logging.INFO,
                     format=FORMAT,
                     datefmt='%m/%d/%Y %I:%M:%S %p')
@@ -94,9 +98,15 @@ def run_train(train_meta,
               output_dir,
               extractor,
               kmeans,
-              audio_type='.mp3'):
+              audio_type='mp3'):
     """
     running kmeans for train set
+    :param train_meta, str, the path of meta.csv file
+    :param audio_file_dir, str, the path of audio folder
+    :param output_dir, str, the path of the output folder
+    :param extractor, torch model
+    :param kmeans, ApplyKmeans
+    :param audio_type, str, extension of audio files
     """
     # reading the meta csv file
     logger.info("Reading file %s", train_meta)
@@ -109,7 +119,7 @@ def run_train(train_meta,
 
     for file in tqdm(df['id'].values, desc='transforming passage to discrete code'):
         # for each audio file
-        audio_file = os.path.join(audio_file_dir, file + audio_type)
+        audio_file = os.path.join(audio_file_dir, file + "." + audio_type)
         wavs = reader(audio_file)
 
         if len(wavs) > 20 * SAMPLE_RATE:
@@ -136,16 +146,22 @@ def run_dev(dev_meta,
             output_dir,
             extractor,
             kmeans,
-            audio_ftype='.mp3'):
+            audio_type='.mp3'):
     """
      running kmeans for train set
+    :param dev_meta, str, the path of meta.csv file
+    :param audio_file_dir, str, the path of audio folder
+    :param output_dir, str, the path of the output folder
+    :param extractor, torch model
+    :param kmeans, ApplyKmeans
+    :param audio_type, str, extension of audio files
     """
     logger.info("Reading file %s", dev_meta)
     df = pd.read_csv(dev_meta)
     ind = 0
 
     for file in tqdm(df['id'].values, desc='transforming passage to discrete code'):
-        audio_file = os.path.join(audio_file_dir, file + audio_ftype)
+        audio_file = os.path.join(audio_file_dir, file + "." + audio_type)
         wavs = reader(audio_file)
         wavs = wavs.cuda()
 
@@ -211,12 +227,16 @@ def parse_args():
 def main():
     args = parse_args()
     logger.info("Starting the script for feature extraction")
-    logger.info("Loading extractor from %s", args.hubert_path)
-    extractor = torch.hub.load('s3prl/s3prl', args.hubert_path)
+    logger.info("Loading extractor from %s", args.hubert)
+    extractor = torch.hub.load('s3prl/s3prl', args.hubert)
     extractor.eval()
     logger.info("Loading trained kmeans %s ", args.kmeans)
     kmeans = ApplyKmeans(args.kmeans)
 
+    # check if there is an output dir
+    if not os.path.exists(args.output):
+        logger.info("Creating output folder")
+        os.mkdir(args.outputdir)
     if args.part == "train":
         run_train(args.meta,
                   args.audios,
@@ -233,3 +253,7 @@ def main():
                 args.audio_type)
     else:
         print("Part name is wrong, should be train or dev.")
+
+
+if __name__ == "__main__":
+    main()
