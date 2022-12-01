@@ -28,40 +28,27 @@ logger = logging.getLogger(__name__)
 
 
 class SQADataset(Dataset):
-    """
-
-    """
+    """ Spoken QA dataset class, reads from features. """
     def __init__(self, data_dir, mode='train', idx_offset=5):
         """
-        Args:
-            data_dir:
-            mode:
-            idx_offset:
+        :param data_dir, str, the path of the data folder
+        :param mode, str, the name of the part
+        :param idx_offset, int, offset between tokens
         """
-        # df = pd.read_csv(os.path.join(data_dir, mode+'_code_answer.csv'))
-        # with open(os.path.join(data_dir, mode+'-hash2question.json')) as f:
-        #     h2q = json.load(f)
-        # TODO: get them from params
         df = pd.read_csv(os.path.join(data_dir, mode, mode + '_code_answer.csv'))
         with open(os.path.join(data_dir, mode, mode + '-hash2question.json')) as f:
             h2q = json.load(f)
 
+        # adding question column to df using hash info
         df['question'] = df['hash'].apply(lambda x: h2q[x])
 
-        # code_dir = os.path.join(data_dir, mode+'-hubert-128-22')
-        # code_passage_dir = os.path.join(data_dir, mode+'-hubert-128-22')
         code_dir = os.path.join(data_dir, mode, mode + "_code")
-        code_passage_dir = os.path.join(data_dir, mode, mode + "_passage_code")
-        context_id = df['context_id'].values
-        question = df['question'].values
-        code_start = df['code_start'].values
-        code_end = df['code_end'].values
 
         self.encodings = []
-        for context_id, question_id, start_idx, end_idx in tqdm(zip(context_id, question, code_start, code_end),
-                                                                total=len(context_id)):
-            context = np.loadtxt(os.path.join(code_passage_dir, 'context-' + context_id + '.code')).astype(int)
-            question = np.loadtxt(os.path.join(code_dir, question_id + '.code')).astype(int)
+        # for each row in the dataframe, it generates encoding
+        for index, row in tqdm(df.iterrows()):
+            context = np.loadtxt(os.path.join(code_dir, 'context-' + row['context_id'] + '.code')).astype(int)
+            question = np.loadtxt(os.path.join(code_dir, row['question'] + '.code')).astype(int)
             if context.shape == ():
                 context = np.expand_dims(context, axis=-1)
             if question.shape == ():
@@ -79,9 +66,8 @@ class SQADataset(Dataset):
 
             '''
             tot_len = len(question) + len(context) + 4
-
-            start_positions = 1 + len(question) + 1 + 1 + start_idx
-            end_positions = 1 + len(question) + 1 + 1 + end_idx
+            start_positions = 1 + len(question) + 1 + 1 + row['code_start']
+            end_positions = 1 + len(question) + 1 + 1 + row['code_end']
             if end_positions > 4096:
                 print('end position: ', end_positions)
                 start_positions, end_positions = 0, 0
@@ -96,7 +82,9 @@ class SQADataset(Dataset):
                 code_pair = [0] + list(question) + [2] + [2] + list(context) + [2]
 
             encoding = {}
-
+            # input_ids: the concatenated question and context features
+            # start_positions: the starting positions of answers
+            # end_positions: the ending positions of the answers
             encoding.update({'input_ids': torch.LongTensor(code_pair),
                              'start_positions': start_positions,
                              'end_positions': end_positions,
