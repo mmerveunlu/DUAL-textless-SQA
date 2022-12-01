@@ -236,7 +236,7 @@ def main():
     # check if there is an output dir
     if not os.path.exists(args.output):
         logger.info("Creating output folder")
-        os.mkdir(args.outputdir)
+        os.mkdir(args.output)
     if args.part == "train":
         run_train(args.meta,
                   args.audios,
