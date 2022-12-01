@@ -46,8 +46,8 @@ def merge_passage(segment_file, data_dir, output_dir):
     for passage, segment_list in tqdm(segment_dict.items()):
         for idx, idy in enumerate(segment_list):
             # opens the code and cnt files
-            code = np.loadtxt(path.join(data_dir, "".join(['context-', passage, SEPARATOR, id, '.code'])))
-            cnt = np.loadtxt(path.join(data_dir, "".join(['context-', passage, SEPARATOR, id, '.cnt'])))
+            code = np.loadtxt(path.join(data_dir, "".join(['context-', str(passage), SEPARATOR, str(idy), '.code'])))
+            cnt = np.loadtxt(path.join(data_dir, "".join(['context-', str(passage), SEPARATOR, str(idy), '.cnt'])))
             if idx == 0:
                 # if id is 0, then it is the starting utterance
                 merge_passage = code
@@ -64,13 +64,13 @@ def merge_passage(segment_file, data_dir, output_dir):
                     merge_passage = np.concatenate([merge_passage, code], axis=-1)
                     merge_cnt = np.concatenate([merge_cnt, cnt], axis=-1)
 
-        output_code = path.join(output_dir, "".join(['context-', passage, '.code']))
-        output_cnt = path.join(output_dir, "".join(['context-', passage, '.cnt']))
+        output_code = path.join(output_dir, "".join(['context-', str(passage), '.code']))
+        output_cnt = path.join(output_dir, "".join(['context-', str(passage), '.cnt']))
         np.savetxt(output_code, merge_passage, fmt='%i')
         np.savetxt(output_cnt, merge_cnt, fmt='%i')
         ind += 1
-        if ind%100 == 0:
-            logging.info("%d numbers of examples are merged" %i)
+        if ind % 100 == 0:
+            logging.info("%d numbers of examples are merged" % i)
 
 
 def parse_args():
