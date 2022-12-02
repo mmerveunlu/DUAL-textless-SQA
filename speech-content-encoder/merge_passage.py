@@ -8,7 +8,7 @@ Args:
     output: str, the path of the output file
 
 Usage:
->
+> python merge_passage.py --segment train_segment_id.json --data train_code --output train_code
 """
 import argparse
 import json
