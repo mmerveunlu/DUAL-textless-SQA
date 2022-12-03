@@ -1,13 +1,15 @@
 """
-This script finds the answer spans in text grid files and returns a dataframe as csv format.
+This script finds the answer spans in text grid files and finds the new start/end point in the context.
 Args:
     input: str, the input folder that contains textgrid files
     data: str, the path of json file, should be SQuAD-like format
+    meta_data: str, the path of the meta data as csv format
     output: str, the path of the output file
 
 Usage:
 > python alignment.py --input textGrid/ \
                       --data train-v1.1.json \
+                      --meta-data meta-train.csv
                       --output train_answer_span.csv
 """
 import argparse
@@ -75,14 +77,13 @@ def find_timespan(tg_file, answer):
         return start_times, end_times
 
 
-def create_timespan_file(input_folder, answers_file, output_file):
+def create_timespan_file(input_folder, answers_file):
     """
     This function creates a dataframe that contains time spans of the answers.
     :param input_folder, str, the path of the input textgrid files
     :param answers_file, str, original dataset json file
-    :param output_file, str, the path of the output csv file
     Returns
-       None
+       pandas.DataFrame, with columns ['hash','text','utterance','start','end']
     """
     logger.info("Opening the original data from %s" % answers_file)
     # get the original dataset
@@ -116,7 +117,55 @@ def create_timespan_file(input_folder, answers_file, output_file):
 
     # save the resulting file as csv
     df = pd.DataFrame.from_dict(data_dict)
-    df.to_csv(output_file, sep=",", header=True, index=False)
+    return df
+
+
+def add_columns(answer_span_df, meta_data, output_file):
+    """
+    This function adds columns to the answer span dataframe.
+      added columns: context_segment_id, context_id, new_start, new_end, new_utterance
+    context_segment_id: the order of the utterance in the context
+    context_id: the context that contains all the utterances
+    new_start: the starts of the answer in the context, equals the sum of the previous parts and start in the utterance
+    new_end: the ending of the answer in the context, equals the sum of the previous parts and end in the utterance
+    Args:
+        :param answer_span_df, DataFrame
+        :param meta_data, str, the path of the metadata
+        :param output_file, str, the path of the output file
+    Returns:
+       None
+    """
+    # opens metadata file
+    meta_data = pd.read_csv(meta_data)
+
+    logger.info("Context segment id added")
+    # Adding context_segment_id
+    answer_span_df["context_segment_id"] = answer_span_df.utterance.str.split("_", expand=True).iloc[:, 2]
+    logger.info("Context segment id is added")
+    # Adding context id
+    cols = answer_span_df.utterance.str.split("-", expand=True).iloc[:, 1].str.split("_", expand=True)
+    logger.info("Context id is added")
+    answer_span_df["context_id"] = cols[0] + "_" + cols[1]
+    # Adding new_start and new_end
+    new_starts = []
+    new_ends = []
+    for index, row in answer_span_df.iterrows():
+        # get the previous parts
+        prev = ["context-" + row['context_id'] + "_" + str(f) for f in range(int(row['context_segment_id']))]
+        # get the sum of the durations
+        filter_in = meta_data['id'].isin(prev)
+        prev_sum = sum(meta_data[filter_in].duration)
+        new_starts.append(round(row['start'] + prev_sum, 3))
+        new_ends.append(round(row['end'] + prev_sum, 3))
+    # add them to df
+    answer_span_df['new_start'] = new_starts
+    answer_span_df['new_end'] = new_ends
+    logger.info("New start/end is added")
+
+    # Apparently new_utterance is the same as utterance
+    answer_span_df['new_utterance'] = answer_span_df['utterance']
+
+    answer_span_df.to_csv(output_file, sep=",", header=True, index=False)
     logger.info("Resulting data is saved to %s " % output_file)
 
 
@@ -129,6 +178,9 @@ def parse_args():
     parser.add_argument('--data',
                         help='input json files that contains squad-format data',
                         required=True)
+    parser.add_argument('--meta',
+                        help='meta data dataframe as csv format',
+                        required=True)
     parser.add_argument('--output',
                         help='Output file name to save resulting csv',
                         required=True)
@@ -139,7 +191,10 @@ def parse_args():
 def main():
     args = parse_args()
     logger.info("Starting the script using input file %s" % args.input)
-    create_timespan_file(args.input, args.data, args.output)
+    df = create_timespan_file(args.input, args.data)
+    logger.info("Answer spans are found in each utterance")
+    add_columns(df, args.meta, args.output)
+    logger.info("New columns are added")
 
 
 if __name__ == "__main__":
