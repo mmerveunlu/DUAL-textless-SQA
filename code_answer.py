@@ -27,7 +27,7 @@ logging.basicConfig(filename='log/data.log',
 logger = logging.getLogger(__name__)
 
 
-def train_code_start_end(input_path, code_input_path, output):
+def add_code_start_end(input_path, code_input_path, output):
     """
     Reads dataframe containing start/end time frames and add two columns
     for code start and end of the answer.
@@ -80,56 +80,6 @@ def train_code_start_end(input_path, code_input_path, output):
     logger.info("Resulting dataframe saved into %s " % output)
 
 
-def dev_code_start_end(input_path, code_input_path, output):
-    """
-    Reads dataframe containing start/end time frames and add two columns
-    for code start and end of the answer.
-    Args:
-        :param input_path, str, the path of the csv file
-        :param code_input_path, str, the path of the folder that contains code and cnt files
-        :param output, str, the path of the output file
-    Returns
-      None
-    """
-    df = pd.read_csv(input_path)
-    code_start = []
-    code_end = []
-
-    for i, row in tqdm(df.iterros()):
-        context_cnt = np.loadtxt(os.path.join(code_input_path, 'context-' + row['context_id'] + '.cnt'))
-        start_ind = row['new_start'] / 0.02
-        end_ind = row['new_end'] / 0.02
-        context_cnt_cum = np.cumsum(context_cnt)
-
-        new_start_ind, new_end_ind = None, None
-        prev = 0
-        for idx, cum_idx in enumerate(context_cnt_cum):
-
-            if cum_idx >= start_ind and new_start_ind is None:
-                if abs(start_ind - prev) <= abs(cum_idx - start_ind):
-                    new_start_ind = idx - 1
-                else:
-                    new_start_ind = idx
-            if cum_idx >= end_ind and new_end_ind is None:
-                if abs(end_ind - prev) <= abs(cum_idx - end_ind):
-                    new_end_ind = idx - 1
-                else:
-                    new_end_ind = idx
-            prev = cum_idx
-        if new_start_ind is None:
-            new_start_ind = idx
-        if new_end_ind is None:
-            new_end_ind = idx
-
-        code_start.append(new_start_ind)
-        code_end.append(new_end_ind)
-
-    df['code_start'] = code_start
-    df['code_end'] = code_end
-
-    df.to_csv(output)
-
-
 def parse_args():
     """ Argument parser"""
     parser = argparse.ArgumentParser(description='Generate meta-file for given tsv file')
@@ -149,7 +99,7 @@ def parse_args():
 def main():
     args = parse_args()
     logger.info("Starting the script using input file %s" % args.input)
-    train_code_start_end(args.input, args.code, args.output)
+    add_code_start_end(args.input, args.code, args.output)
 
 
 if __name__ == "__main__":
