@@ -244,7 +244,7 @@ def main():
                   extractor,
                   kmeans,
                   args.audio_type)
-    elif args.path == "dev":
+    elif args.part == "dev":
         run_dev(args.mete,
                 args.audios,
                 args.output,
