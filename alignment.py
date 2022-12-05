@@ -9,7 +9,7 @@ Args:
 Usage:
 > python alignment.py --input textGrid/ \
                       --data train-v1.1.json \
-                      --meta-data meta-train.csv
+                      --meta meta-train.csv
                       --output train_answer_span.csv
 """
 import argparse
