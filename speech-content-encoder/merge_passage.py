@@ -70,7 +70,7 @@ def merge_passage(segment_file, data_dir, output_dir):
         np.savetxt(output_cnt, merge_cnt, fmt='%i')
         ind += 1
         if ind % 100 == 0:
-            logging.info("%d numbers of examples are merged" % i)
+            logging.info("%d numbers of examples are merged" % ind)
 
 
 def parse_args():
