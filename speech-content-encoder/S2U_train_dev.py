@@ -159,6 +159,9 @@ def run_dev(dev_meta,
     logger.info("Reading file %s", dev_meta)
     df = pd.read_csv(dev_meta)
     ind = 0
+    if torch.cuda.is_available():
+        # load the extractor
+        extractor = extractor.cuda()
 
     for file in tqdm(df['id'].values, desc='transforming passage to discrete code'):
         audio_file = os.path.join(audio_file_dir, file + "." + audio_type)
