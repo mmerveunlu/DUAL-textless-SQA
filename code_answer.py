@@ -44,34 +44,39 @@ def add_code_start_end(input_path, code_input_path, output):
     code_start = []
     code_end = []
     for i, row in tqdm(df.iterrows()):
-        context_cnt = np.loadtxt(os.path.join(code_input_path, 'context-' + row['context_id'] + '.cnt'))
-        start_ind = row['new_start'] / 0.02
-        end_ind = row['new_end'] / 0.02
-        context_cnt_cum = np.cumsum(context_cnt)
+        fname = os.path.join(code_input_path, 'context-' + row['context_id'] + '.cnt')
+        if os.path.exists(fname):
+            context_cnt = np.loadtxt(fname)
+            start_ind = row['new_start'] / 0.02
+            end_ind = row['new_end'] / 0.02
+            context_cnt_cum = np.cumsum(context_cnt)
 
-        new_start_ind, new_end_ind = None, None
-        prev = 0
-        for idx, cum_idx in enumerate(context_cnt_cum):
-            if cum_idx >= start_ind and new_start_ind is None:
-                if abs(start_ind - prev) <= abs(cum_idx - start_ind):
-                    new_start_ind = idx - 1
-                else:
-                    new_start_ind = idx
-            if cum_idx >= end_ind and new_end_ind is None:
-                if abs(end_ind - prev) <= abs(cum_idx - end_ind):
-                    new_end_ind = idx - 1
-                else:
-                    new_end_ind = idx
-            prev = cum_idx
-        if new_start_ind is None:
-            new_start_ind = idx
-        if new_end_ind is None:
-            new_end_ind = idx
+            new_start_ind, new_end_ind = None, None
+            prev = 0
+            for idx, cum_idx in enumerate(context_cnt_cum):
+                if cum_idx >= start_ind and new_start_ind is None:
+                    if abs(start_ind - prev) <= abs(cum_idx - start_ind):
+                        new_start_ind = idx - 1
+                    else:
+                        new_start_ind = idx
+                if cum_idx >= end_ind and new_end_ind is None:
+                    if abs(end_ind - prev) <= abs(cum_idx - end_ind):
+                        new_end_ind = idx - 1
+                    else:
+                        new_end_ind = idx
+                prev = cum_idx
+            if new_start_ind is None:
+                new_start_ind = idx
+            if new_end_ind is None:
+                new_end_ind = idx
 
-        code_start.append(new_start_ind)
-        code_end.append(new_end_ind)
-        if i%100 == 0:
-            logger.info("Processed %d numbers of example" % i)
+            code_start.append(new_start_ind)
+            code_end.append(new_end_ind)
+            if i%100 == 0:
+                logger.info("Processed %d numbers of example" % i)
+        else:
+            code_start.append(-1)
+            code_end.append(-1)
 
     df['code_start'] = code_start
     df['code_end'] = code_end
