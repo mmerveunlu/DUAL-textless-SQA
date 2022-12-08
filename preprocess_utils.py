@@ -1,14 +1,24 @@
 """
-This script reads tsv file and generates meta file in csv format.
-The output meta file contains following columns:
-   - id: the name of the sentence, unique for each row has template as [context|question]-[0-9]+_[0-9]+_[0-9]+
-   - speaker: the name of the speaker
-   - duration: the duration of the audio file
-   - text: string, the content as sentence
-   - normalized_text: string, normalized text
+This script generates necessary files for preprocessing and training the dataset.
+It takes a json file (formatted as SQuAD-train) and audio folder.
+Outputs are three files:
+  * meta-data.csv: contains id, speaker, duration, context, normalized context
+  * data_segment_id.json: contains paragraphs indices and utterance indices as "0_0":{"0","1","2"}
+  * hash2question.json: contains question ids from original data and ids from generated files as "hash1":"question-0_0_0"
 
+Inputs:
+  input: str, the path of the original json/tsv file
+  audio: str, the path of the audio files
+  audio_format: str, the extension of audio files as mp3, wav
+  format: str, the extension of the original file as tsv of json
+  output: str, the path of the output folder
+  debug: bool, set True if the generated files are checked.
 Usage:
->> python preprocess_utils.py --input train.tsv --audio clips --output meta-train.tsv
+> python preprocess_utils.py --input original_train.json
+                             --audio audios/ \
+                             --audio_format wav \
+                             --format json
+                             --output train/ \
 """
 
 import argparse
@@ -243,9 +253,6 @@ def parse_args():
     parser.add_argument('--output',
                         help='Output file/folder name',
                         required=True)
-    parser.add_argument('--language',
-                        help='Language abbreviation for speech',
-                        default="eng")
     parser.add_argument('--debug',
                         help='Set True if simple check is applied',
                         action='store_true')
