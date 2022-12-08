@@ -51,13 +51,11 @@ def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, for
         tokenizes the paragraphs into sentences (utterances)
         gets the duration of related audio file.
         saves three files to the given output folder.
-    Args:
-        :param original_data, dict of data, SQuAD formatted
-        :param audio_dir, str, the path of the audio files, files naming as context-X_X_X.wav
-        :param output_folder, str, the path of the output folder
-        :param format, str, the audio format as wav, mp3
-    Returns:
-      None
+    Args
+      :param original_data, dict of data, SQuAD formatted
+      :param audio_dir, str, the path of the audio files, files naming as context-X_X_X.wav
+      :param output_folder, str, the path of the output folder
+      :param format, str, the audio format as wav, mp3
     """
     # meta dict is an array of dict.
     # each element is a dict with keys: "id","speaker","duration","text","normalized_text"
@@ -72,7 +70,7 @@ def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, for
     audio_files = [f for f in sorted(listdir(audio_dir)) if f.endswith("."+format)]
     logger.info("Number of audio files in %s : %d "% (audio_dir, len(audio_files)))
 
-    for i, file in tqdm(enumerate(audio_files)):
+    for i, file in enumerate(tqdm(audio_files)):
         # for each audio file
         # indices = file.replace("context-", "").split(".")[0].split("")
         indices = re.findall(r'\d', file)
@@ -120,7 +118,7 @@ def generate_hash2question(original_data, output_folder):
     This function takes a dict file and generates hash2question dictionary.
     The keys are the hash ids from dict file, and the values are the question indices.
     Ex:   "038v87hfbv": "question-0_0_0"
-    Args:
+    Args
         :param original_data, dict object, SQuAD formatted
         :param output_folder, str, the path of the output folder
     Returns
@@ -136,13 +134,14 @@ def generate_hash2question(original_data, output_folder):
         json.dump(hash2question, fp)
 
 
-def check_files(original_data, audio_dir, output_folder):
+def check_files(original_data, audio_dir, output_folder, format):
     """
     It simply check the number of occurences in the generated files.
     Args:
-        original_data: str, the path of the json file, SQuAD formatted
-        audio_dir: str, the path of the audio files
-        output_folder: str, the path of the output contains all generated files
+        :param original_data, str, the path of the json file, SQuAD formatted
+        :param audio_dir, str, the path of the audio files
+        :param output_folder, str, the path of the output contains all generated files
+        :param format, str, audio files extension as wav, mp3
     Returns:
         None
     """
@@ -152,7 +151,7 @@ def check_files(original_data, audio_dir, output_folder):
     with open(original_data) as fp:
         original_data = json.load(fp)['data']
     # the number of rows in meta must be the same as the number of wav/mp3 files in audio
-    audios = [f for f in listdir(audio_dir) if f.endswith(".wav")]
+    audios = [f for f in listdir(audio_dir) if f.endswith(format)]
     meta_data = pd.read_csv(path.join(output_folder, "meta_data.csv"))
     assert (meta_data.shape[0] == len(audios))
     logger.info("Check on meta data rows: OK.")
@@ -174,7 +173,7 @@ def check_files(original_data, audio_dir, output_folder):
     assert (segments_value == meta_data.shape[0])
     logger.info("Check on segments values: OK.")
 
-    # Number of elements in has2question must be the same as the number of question in the original data
+    # Number of elements in hash2question must be the same as the number of question in the original data
     with open(path.join(output_folder, "hash2question.json")) as fp:
         hash2questions = json.load(fp)
     assert(len(hash2questions) == nbr_q)
@@ -269,7 +268,7 @@ def main():
         print("The format of the input file must be given as json or tsv")
     if args.debug:
         logger.info("Checking the generated files")
-        check_files(args.input, args.audio, args.output)
+        check_files(args.input, args.audio, args.output, args.audio_format)
     return
 
 
