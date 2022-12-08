@@ -65,12 +65,14 @@ def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, for
     meta_dict_err = []
     segments = {}
     # get the original dict
+    logger.info("Opening the original data file from %s " % original_data)
     with open(original_data) as fp:
         original_data = json.load(fp)['data']
 
     audio_files = [f for f in sorted(listdir(audio_dir)) if f.endswith("."+format)]
+    logger.info("Number of audio files in %s : %d "% (audio_dir, len(audio_files)))
 
-    for file in tqdm(audio_files):
+    for i, file in tqdm(enumerate(audio_files)):
         # for each audio file
         # indices = file.replace("context-", "").split(".")[0].split("")
         indices = re.findall(r'\d', file)
@@ -94,15 +96,23 @@ def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, for
         except:
             # very simple check
             meta_dict_err.append(file)
+            logger.info(" Error on file %s" % file)
+        if i % 100 == 0:
+            logger.info("Processed %d numbers of file " % i)
     # saving meta-[part].csv
     meta_df_train = pd.DataFrame.from_dict(meta_dict)
     # save meta info
-    meta_df_train.to_csv(path.join(output_folder, "meta_data.csv"))
+    save_meta_csv(meta_df_train, path.join(output_folder, "meta_data.csv"))
+    logger.info("Meta data is saved: %s" % output_folder)
+
     # save segment info
-    with open(path.join(output_folder, "data_segment_id.json"),"w+") as fp:
+    with open(path.join(output_folder, "data_segment_id.json"), "w+") as fp:
         json.dump(segments, fp)
+    logger.info("Segments data is saved: %s" % output_folder)
+
     # save hash2question
     generate_hash2question(original_data, output_folder)
+    logger.info("Hash2Question data is saved: %s" % output_folder)
 
 
 def generate_hash2question(original_data, output_folder):
@@ -138,12 +148,14 @@ def check_files(original_data, audio_dir, output_folder):
     """
     # Simple check for the files
     # get the original dict
+    logger.info("Checking files")
     with open(original_data) as fp:
         original_data = json.load(fp)['data']
     # the number of rows in meta must be the same as the number of wav/mp3 files in audio
     audios = [f for f in listdir(audio_dir) if f.endswith(".wav")]
     meta_data = pd.read_csv(path.join(output_folder, "meta_data.csv"))
     assert (meta_data.shape[0] == len(audios))
+    logger.info("Check on meta data rows: OK.")
     # Number of keys in segments must be the same as the number of paragraphs in the original data
     nbr_a = len(original_data)
     nbr_p = 0
@@ -155,14 +167,18 @@ def check_files(original_data, audio_dir, output_folder):
     with open(path.join(output_folder, "data_segment_id.json")) as fp:
         segments = json.load(fp)
     assert(nbr_p == len(segments))
+    logger.info("Check on segments keys: OK.")
+
     # Number of values in segments must be the same as the number of rows of the meta = (nbr of audio)
     segments_value = sum([len(s) for k, s in segments.items()])
     assert (segments_value == meta_data.shape[0])
+    logger.info("Check on segments values: OK.")
 
     # Number of elements in has2question must be the same as the number of question in the original data
     with open(path.join(output_folder, "hash2question.json")) as fp:
         hash2questions = json.load(fp)
     assert(len(hash2questions) == nbr_q)
+    logger.info("Check on hash2question: OK.")
 
 
 def preprocess_data_from_tsv(text_file, audio_dir):
@@ -201,10 +217,13 @@ def preprocess_data_from_tsv(text_file, audio_dir):
 
 
 def save_meta_csv(dt, out_file):
-    """
-    saves the given dt into a file
+    """ saves the given dt into a file
+    Args:
+        :param dt, pandas DataFrame
+        :param out_file, str, the path of the output csv file
     """
     dt.to_csv(out_file, sep=",", header=True, index=False)
+    logger.info("Resulting file saved into %s " % out_file)
 
 
 def parse_args():
@@ -239,14 +258,17 @@ def main():
     args = parse_args()
     logger.info("Starting the script using input file %s" % args.input)
     if args.format == "tsv":
+        logger.info("Running with tsv file")
         dt = preprocess_data_from_tsv(args.input, args.audio)
         logger.info("Saving the meta file into %s " % args.output)
         save_meta_csv(dt, args.output)
     elif args.format == "json":
+        logger.info("Running with json file")
         generate_meta_segment_hash_file(args.input, args.audio, args.output, args.audio_format)
     else:
         print("The format of the input file must be given as json or tsv")
     if args.debug:
+        logger.info("Checking the generated files")
         check_files(args.input, args.audio, args.output)
     return
 
