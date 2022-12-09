@@ -83,7 +83,7 @@ def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, for
     for i, file in enumerate(tqdm(audio_files)):
         # for each audio file
         # indices = file.replace("context-", "").split(".")[0].split("")
-        indices = re.findall(r'\d', file)
+        indices = re.findall(r'\d+', file)
         # get the duration of the sentence/utterance
         duration = get_length(path.join(audio_dir, file))
         seg_key = indices[0] + "_" + indices[1]
