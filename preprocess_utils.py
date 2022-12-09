@@ -1,10 +1,11 @@
 """
 This script generates necessary files for preprocessing and training the dataset.
 It takes a json file (formatted as SQuAD-train) and audio folder.
-Outputs are three files:
+Outputs are three files and text files for each audios
   * meta-data.csv: contains id, speaker, duration, context, normalized context
   * data_segment_id.json: contains paragraphs indices and utterance indices as "0_0":{"0","1","2"}
   * hash2question.json: contains question ids from original data and ids from generated files as "hash1":"question-0_0_0"
+  * [*].lab: contains text files related to each audio
 
 Inputs:
   input: str, the path of the original json/tsv file
@@ -49,6 +50,17 @@ def get_length(audio):
     """returns the length of the audio in seconds"""
     sound = AudioSegment.from_file(audio)
     return round((sound.duration_seconds % 60), 3)
+
+
+def create_text_files(data, output):
+    """ The function creates text files related to each audio file
+    Args:
+        :param data, pandas DataFrame, contains id, text, normalized text and speaker
+        :param output, str, the path of the output folder
+    """
+    for i, row in data.iterrows():
+        with open(path.join(output, row['id'] + ".lab"), "w+") as fp:
+            fp.writelines(row['text'])
 
 
 def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, format="wav"):
@@ -121,6 +133,10 @@ def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, for
     # save hash2question
     generate_hash2question(original_data, output_folder)
     logger.info("Hash2Question data is saved: %s" % output_folder)
+
+    # create text files inn the audio folder
+    create_text_files(meta_df_train, audio_dir)
+    logger.info("Text files are saved into %s", audio_dir)
 
 
 def generate_hash2question(original_data, output_folder):
