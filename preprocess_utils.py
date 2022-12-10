@@ -28,8 +28,8 @@ import logging
 from os import path, listdir
 import re
 
-import librosa
-from mutagen.mp3 import MP3
+# import librosa
+# from mutagen.mp3 import MP3
 import pandas as pd
 from pydub import AudioSegment
 from tqdm import tqdm
@@ -92,12 +92,12 @@ def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, for
     audio_files = sorted([f for f in sorted(listdir(audio_dir)) if f.endswith("."+format)])
     logger.info("Number of audio files in %s : %d "% (audio_dir, len(audio_files)))
     # getting the files anmes only grouped with passages
-    context_names = list(set(["_".join(f.split("_")[0:2]) for f in audio_files]))
+    context_names = sorted(list(set(["_".join(f.split("_")[0:2]) for f in audio_files])))
     logger.info("Number of audio files by passages %d "% len(audio_files))
 
     for i, ctx in enumerate(tqdm(context_names)):
         # for each context first find all audio files
-        ctx_audios = [f for f in audio_files if f.startswith((ctx))]
+        ctx_audios = sorted([f for f in audio_files if f.startswith(ctx+"_")])
         indices = re.findall(r'\d+', ctx)
         context = original_data[int(indices[0])]['paragraphs'][int(indices[1])]['context']
         sentences = re.split("[.?!]( )+", context)
@@ -109,7 +109,7 @@ def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, for
             seg_key = indices[0] + "_" + indices[1]
             if not (seg_key in segments):
                 segments[seg_key] = []
-            segments[seg_key].append(file.split("_")[-1])
+            segments[seg_key].append(file.split("_")[-1].replace("."+format, ""))
 
             meta_dict.append({"id": file.replace("."+format, ""),
                               "speaker": "Google-TTS",
