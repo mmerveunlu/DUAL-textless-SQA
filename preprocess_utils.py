@@ -89,34 +89,33 @@ def generate_meta_segment_hash_file(original_data, audio_dir, output_folder, for
     with open(original_data) as fp:
         original_data = json.load(fp)['data']
 
-    audio_files = [f for f in sorted(listdir(audio_dir)) if f.endswith("."+format)]
+    audio_files = sorted([f for f in sorted(listdir(audio_dir)) if f.endswith("."+format)])
     logger.info("Number of audio files in %s : %d "% (audio_dir, len(audio_files)))
+    # getting the files anmes only grouped with passages
+    context_names = list(set(["_".join(f.split("_")[0:2]) for f in audio_files]))
+    logger.info("Number of audio files by passages %d "% len(audio_files))
 
-    for i, file in enumerate(tqdm(audio_files)):
-        # for each audio file
-        # indices = file.replace("context-", "").split(".")[0].split("")
-        indices = re.findall(r'\d+', file)
-        # get the duration of the sentence/utterance
-        duration = get_length(path.join(audio_dir, file))
-        seg_key = indices[0] + "_" + indices[1]
-        if not (seg_key in segments):
-            segments[seg_key] = []
-
+    for i, ctx in enumerate(tqdm(context_names)):
+        # for each context first find all audio files
+        ctx_audios = [f for f in audio_files if f.startswith((ctx))]
+        indices = re.findall(r'\d+', ctx)
         context = original_data[int(indices[0])]['paragraphs'][int(indices[1])]['context']
-        try:
-            # sentences = tokenizer.tokenize(context)
-            sentences = re.split("[.?!]( )+", context)
-            sentences = [s for s in sentences if not(s == " ")]
-            meta_dict.append({"id": "context-" + "_".join(indices),
+        sentences = re.split("[.?!]( )+", context)
+        sentences = [s for s in sentences if not (s == " ")]
+        for j, file in enumerate(ctx_audios):
+            # indices = file.replace("context-", "").split(".")[0].split("")
+            # get the duration of the  audio file
+            duration = get_length(path.join(audio_dir, file))
+            seg_key = indices[0] + "_" + indices[1]
+            if not (seg_key in segments):
+                segments[seg_key] = []
+            segments[seg_key].append(file.split("_")[-1])
+
+            meta_dict.append({"id": file.replace("."+format, ""),
                               "speaker": "Google-TTS",
-                              "text": sentences[int(indices[2])],
-                              "normalized_text": text_preprocess(sentences[int(indices[2])]),
+                              "text": sentences[j],
+                              "normalized_text": text_preprocess(sentences[j]),
                               "duration": duration})
-            segments[seg_key].append(indices[2])
-        except:
-            # very simple check
-            meta_dict_err.append(file)
-            logger.info(" Error on file %s" % file)
         if i % 100 == 0:
             logger.info("Processed %d numbers of file " % i)
     # saving meta-[part].csv
