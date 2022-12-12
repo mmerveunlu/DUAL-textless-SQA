@@ -123,6 +123,7 @@ def run_train(train_meta,
         wavs = reader(audio_file)
 
         if len(wavs) > 20 * SAMPLE_RATE:
+            print(f'{file} too long')
             continue
 
         wavs = wavs.cuda()
