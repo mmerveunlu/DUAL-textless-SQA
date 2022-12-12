@@ -13,6 +13,7 @@ Usage:
 import argparse
 import json
 import logging
+import os.path
 from os import path
 
 import numpy as np
@@ -42,32 +43,38 @@ def merge_passage(segment_file, data_dir, output_dir):
     with open(segment_file, 'r') as f:
         segment_dict = json.load(f)
     ind = 0
-
     for passage, segment_list in tqdm(segment_dict.items()):
+        whole_passage = np.array([])
+        whole_cnt = np.array([])
+        segment_list = sorted([int(s) for s in segment_list])
         for idx, idy in enumerate(segment_list):
             # opens the code and cnt files
-            code = np.loadtxt(path.join(data_dir, "".join(['context-', str(passage), SEPARATOR, str(idy), '.code'])))
-            cnt = np.loadtxt(path.join(data_dir, "".join(['context-', str(passage), SEPARATOR, str(idy), '.cnt'])))
-            if idx == 0:
-                # if id is 0, then it is the starting utterance
-                merge_passage = code
-                merge_cnt = cnt
+            file_name = path.join(data_dir, "".join(['context-', str(passage), SEPARATOR, str(idy), '.code']))
+            if os.path.exists(file_name):
+                code = np.loadtxt(file_name)
+                cnt = np.loadtxt(path.join(data_dir, "".join(['context-', str(passage), SEPARATOR, str(idy), '.cnt'])))
+                # if idx == 0:
+                if not np.any(whole_passage):
+                    # if id is 0, then it is the starting utterance
+                    whole_passage = code
+                    whole_cnt = cnt
+                else:
+                    # if id is not 0, then they are in the middle
+                    try:
+                        whole_passage = np.concatenate([whole_passage, code], axis=-1)
+                        whole_cnt = np.concatenate([whole_cnt, cnt], axis=-1)
+                    except:
+                        print(f'passage: {passage} len {whole_passage.shape[-1]}')
+                        code = np.array([code])
+                        cnt = np.array([cnt])
+                        whole_passage = np.concatenate([whole_passage, code], axis=-1)
+                        whole_cnt = np.concatenate([whole_cnt, cnt], axis=-1)
             else:
-                # if id is not 0, then they are in the middle
-                try:
-                    merge_passage = np.concatenate([merge_passage, code], axis=-1)
-                    merge_cnt = np.concatenate([merge_cnt, cnt], axis=-1)
-                except:
-                    print(f'passage: {passage} len {merge_passage.shape[-1]}')
-                    code = np.array([code])
-                    cnt = np.array([cnt])
-                    merge_passage = np.concatenate([merge_passage, code], axis=-1)
-                    merge_cnt = np.concatenate([merge_cnt, cnt], axis=-1)
-
+                logger.info("Filename %s does not exists" % file_name)
         output_code = path.join(output_dir, "".join(['context-', str(passage), '.code']))
         output_cnt = path.join(output_dir, "".join(['context-', str(passage), '.cnt']))
-        np.savetxt(output_code, merge_passage, fmt='%i')
-        np.savetxt(output_cnt, merge_cnt, fmt='%i')
+        np.savetxt(output_code, whole_passage, fmt='%i')
+        np.savetxt(output_cnt, whole_cnt, fmt='%i')
         ind += 1
         if ind % 100 == 0:
             logging.info("%d numbers of examples are merged" % ind)
