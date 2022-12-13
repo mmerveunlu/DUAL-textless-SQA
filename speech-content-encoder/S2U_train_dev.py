@@ -121,16 +121,29 @@ def run_train(train_meta,
         # for each audio file
         audio_file = os.path.join(audio_file_dir, file + "." + audio_type)
         wavs = reader(audio_file)
+        wavs = wavs.cuda()
 
         if len(wavs) > 20 * SAMPLE_RATE:
-            print(f'{file} too long')
-            continue
+            logger.info(f'{file} too long')
+            chunks = torch.split(wavs, CHUNK_LENGTH)
+            for i, chunk in enumerate(chunks):
+                feat = extractor([chunk])
+                feat = feat['hidden_state_22'].squeeze()
 
-        wavs = wavs.cuda()
-        # extract the features for each audio file
-        feature = extractor([wavs])
+                if i == 0:
+                    feature = feat
+                else:
+                    feature = torch.cat([feature, feat], dim=0)
 
-        code = kmeans(feature['hidden_state_22'].squeeze().cuda())
+            code = kmeans(feature.cuda())
+            # continue
+        else:
+
+            # extract the features for each audio file
+            feature = extractor([wavs])
+
+            code = kmeans(feature['hidden_state_22'].squeeze().cuda())
+
         code = torch.tensor(code)
 
         merged_code, counts = torch.unique_consecutive(code, return_counts=True)
