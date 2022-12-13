@@ -1,36 +1,36 @@
 """"
-
+This function evaluates given model on dev data. 
+Args:
+    data_dir: str, the path of the dataset directoy.
+       It must contain answer span dataframe, hash2question and code features.
+    model_path: str, the path of the trained model
+    output_dir: str, the path of the output directory
+    batch_size: int, the batsh size during evaluation
+Usage:
 """
-# TODO: add function for main
-
 import argparse
-import os
 import json
+import logging
+import os
 
 import numpy as np
 import pandas as pd
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
-from torch.nn.functional import softmax
 from torch.nn import LogSoftmax
 from transformers import LongformerTokenizerFast, LongformerForQuestionAnswering
 from tqdm.auto import tqdm
 
 from utils import aggregate_dev_result, AOS_scores, Frame_F1_scores
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--data_dir', default='/home/daniel094144/data_folder/SQA_code', type=str)
-parser.add_argument('--model_path', default=None, type=str)
-parser.add_argument('--output_dir', default='./', type=str)
-parser.add_argument('--output_fname', default=None, type=str)
-args = parser.parse_args()
+FORMAT = "%(asctime)s - %(name)s - %(levelname)s -[%(filename)s:%(lineno)s - %(funcName)20s() ]- %(message)s"
+logging.basicConfig(filename='log/data.log',
+                    level=logging.INFO,
+                    format=FORMAT,
+                    datefmt='%m/%d/%Y %I:%M:%S %p')
 
-data_dir = args.data_dir
-if not os.path.exists(args.output_dir):
-    os.makedirs(args.output_dir)
-model = LongformerForQuestionAnswering.from_pretrained(args.model_path).cuda()
-model.eval()
+logger = logging.getLogger(__name__)
 
 '''
 post-processing the answer prediction
@@ -235,91 +235,139 @@ def idx2sec(pred_start_idx, pred_end_idx, context_begin, context_cnt):
 
 ##############
 
-# TODO: function for main
 
-batch_size = 4
-valid_dataset = SQADevDataset(data_dir)
-dataloader = DataLoader(valid_dataset, batch_size=batch_size, collate_fn=collate_dev_fn, shuffle=False)
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_dir',
+                        help="directory that contains dataset",
+                        type=str,
+                        required=True)
+    parser.add_argument('--model_path',
+                        help="directory that contains trained model",
+                        drequired=True)
+    parser.add_argument('--batch_size',
+                        help="batch size during evaluation",
+                        type=int,
+                        default=4)
+    parser.add_argument('--output_dir',
+                        help="directory for the output files",
+                        default='./')
+    args = parser.parse_args()
+    return args
 
-df = pd.read_csv(os.path.join(data_dir, 'dev_code_answer.csv'))
 
-with open(os.path.join(data_dir, 'dataset/NMSQA/dev-hash2question.json'), 'r') as f:
-    h2q = json.load(f)
-df['question'] = df['hash'].apply(lambda x: h2q[x])
-# different answer annotators 
-dup = df.duplicated(subset=['hash'], keep='last').values
-start_secs = df['new_start'].values
-end_secs = df['new_end'].values
+def run_dev_eval(model_path, batch_size, data_dir, output_dir ):
+    """
+    Runs the evaluation on dev data.
+    Args:
+        model_path: str, the path of trained model
+        batch_size: int, the batch size during evaluation
+        data_dir: str, the input folder
+        output_dir: str, the output folder
 
-f1s_before = []
-f1s_after = []
-f1s_after_sec = []
-pred_starts = []
-pred_ends = []
-AOSs = []
-with torch.no_grad():
-    i = 0
-    for batch in tqdm(dataloader):
-        outputs = model(input_ids=batch['input_ids'].cuda(),
-                        attention_mask=batch['attention_mask'].cuda())
-        # start_logits: (B, seq_len)
-        pred_start = torch.argmax(outputs.start_logits, dim=1)
-        pred_end = torch.argmax(outputs.end_logits, dim=1)
+    Returns:
+      None
+    """
+    model = LongformerForQuestionAnswering.from_pretrained(model_path).cuda()
+    model.eval()
+    logger.info("Model loaded")
 
-        start_prob = softmax(outputs.start_logits, dim=1)
-        end_prob = softmax(outputs.end_logits, dim=1)
+    # batch_size = 4
+    valid_dataset = SQADevDataset(data_dir)
+    dataloader = DataLoader(valid_dataset, batch_size=batch_size, collate_fn=collate_dev_fn, shuffle=False)
 
-        logsoftmax = LogSoftmax(dim=1)
-        start_logprob = logsoftmax(outputs.start_logits)
-        end_logprob = logsoftmax(outputs.end_logits)
+    df = pd.read_csv(os.path.join(data_dir, 'dev_code_answer.csv'))
 
-        final_starts, final_ends = [], []
-        if batch_size == 1:
-            final_starts, final_ends = post_process_prediction(start_logprob, end_logprob,
-                                                               batch['context_begin'], 3, 275)
+    with open(os.path.join(data_dir, 'hash2question.json'), 'r') as f:
+        h2q = json.load(f)
+    df['question'] = df['hash'].apply(lambda x: h2q[x])
+    logger.info("Data load")
 
-        else:
-            for j in range(start_logprob.shape[0]):
-                final_start, final_end = post_process_prediction(start_logprob[j], end_logprob[j],
-                                                                 batch['context_begin'][j], 3, 275)
-                final_starts.append(final_start)
-                final_ends.append(final_end)
+    # different answer annotators
+    dup = df.duplicated(subset=['hash'], keep='last').values
+    start_secs = df['new_start'].values
+    end_secs = df['new_end'].values
 
-        final_start_secs, final_end_secs = [], []
-        for final_start, final_end, context_begin, context_cnt in zip(final_starts, final_ends,
-                                                                      batch['context_begin'].cpu(),
-                                                                      batch['context_cnt'].cpu()):
-            final_start_sec, final_end_sec = idx2sec(final_start, final_end, context_begin, context_cnt)
-            final_start_secs.append(final_start_sec)
-            final_end_secs.append(final_end_sec)
+    # f1s_before = []
+    # f1s_after = []
+    f1s_after_sec = []
+    pred_starts = []
+    pred_ends = []
+    AOSs = []
+    logger.info("Evaluation starting")
 
-        f1_after_sec = Frame_F1_scores(start_secs[i:i + batch_size], end_secs[i:i + batch_size],
-                                       final_start_secs, final_end_secs)
-        AOS_sec = AOS_scores(start_secs[i:i + batch_size], end_secs[i:i + batch_size],
-                             final_start_secs, final_end_secs)
+    with torch.no_grad():
+        i = 0
+        for batch in tqdm(dataloader):
+            outputs = model(input_ids=batch['input_ids'].cuda(),
+                            attention_mask=batch['attention_mask'].cuda())
+            # start_logits: (B, seq_len)
+            # pred_start = torch.argmax(outputs.start_logits, dim=1)
+            # pred_end = torch.argmax(outputs.end_logits, dim=1)
 
-        print(f1_after_sec, AOS_sec)
-        f1s_after_sec += f1_after_sec
-        AOSs += AOS_sec
-        pred_starts += final_start_secs
-        pred_ends += final_end_secs
+            # start_prob = softmax(outputs.start_logits, dim=1)
+            # end_prob = softmax(outputs.end_logits, dim=1)
 
-        i += batch_size
+            logsoftmax = LogSoftmax(dim=1)
+            start_logprob = logsoftmax(outputs.start_logits)
+            end_logprob = logsoftmax(outputs.end_logits)
 
-output_df = pd.DataFrame(
-    list(zip(df['question'].values, start_secs, end_secs, pred_starts, pred_ends, f1s_after_sec, AOSs, dup)),
-    columns=['question', 'gt_start', 'gt_end', 'pred_start', 'pred_end', 'f1', 'AOS', 'dup'])
+            final_starts, final_ends = [], []
+            if batch_size == 1:
+                final_starts, final_ends = post_process_prediction(start_logprob, end_logprob,
+                                                                   batch['context_begin'], 3, 275)
 
-output_df.to_csv(os.path.join(args.output_dir, args.output_fname + '.csv'))
+            else:
+                for j in range(start_logprob.shape[0]):
+                    final_start, final_end = post_process_prediction(start_logprob[j], end_logprob[j],
+                                                                     batch['context_begin'][j], 3, 275)
+                    final_starts.append(final_start)
+                    final_ends.append(final_end)
 
-agg_dev_Frame_F1_score_after_sec = aggregate_dev_result(dup, f1s_after_sec)
-agg_dev_AOSs = aggregate_dev_result(dup, AOSs)
+            final_start_secs, final_end_secs = [], []
+            for final_start, final_end, context_begin, context_cnt in zip(final_starts, final_ends,
+                                                                          batch['context_begin'].cpu(),
+                                                                          batch['context_cnt'].cpu()):
+                final_start_sec, final_end_sec = idx2sec(final_start, final_end, context_begin, context_cnt)
+                final_start_secs.append(final_start_sec)
+                final_end_secs.append(final_end_sec)
 
-print(args.output_fname)
-print('post-processed f1 sec: ', agg_dev_Frame_F1_score_after_sec)
-print('post-processed aos sec: ', agg_dev_AOSs)
+            f1_after_sec = Frame_F1_scores(start_secs[i:i + batch_size], end_secs[i:i + batch_size],
+                                           final_start_secs, final_end_secs)
+            AOS_sec = AOS_scores(start_secs[i:i + batch_size], end_secs[i:i + batch_size],
+                                 final_start_secs, final_end_secs)
 
-with open(args.output_fname + '.txt', 'w') as f:
-    f.write(args.output_fname)
-    f.write('post-processed f1 sec: ' + str(agg_dev_Frame_F1_score_after_sec))
-    f.write('post-processed aos sec: ' + str(agg_dev_AOSs))
+            print(f1_after_sec, AOS_sec)
+            f1s_after_sec += f1_after_sec
+            AOSs += AOS_sec
+            pred_starts += final_start_secs
+            pred_ends += final_end_secs
+
+            i += batch_size
+
+    output_df = pd.DataFrame(
+        list(zip(df['question'].values, start_secs, end_secs, pred_starts, pred_ends, f1s_after_sec, AOSs, dup)),
+        columns=['question', 'gt_start', 'gt_end', 'pred_start', 'pred_end', 'f1', 'AOS', 'dup'])
+
+    output_df.to_csv(os.path.join(output_dir, 'dev_eval_results.csv'))
+
+    agg_dev_Frame_F1_score_after_sec = aggregate_dev_result(dup, f1s_after_sec)
+    agg_dev_AOSs = aggregate_dev_result(dup, AOSs)
+
+    print(output_dir)
+    print('post-processed f1 sec: ', agg_dev_Frame_F1_score_after_sec)
+    print('post-processed aos sec: ', agg_dev_AOSs)
+
+    with open(os.path.join(output_dir, 'timings.txt', 'w')) as f:
+        f.write('post-processed f1 sec: ' + str(agg_dev_Frame_F1_score_after_sec))
+        f.write('post-processed aos sec: ' + str(agg_dev_AOSs))
+
+    return
+
+
+def main():
+    args = parse_args()
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    run_dev_eval(args.model_path, args.batch_size, args.data_dir, args.output_dir)
+
