@@ -261,7 +261,7 @@ def main():
                   extractor,
                   kmeans,
                   args.audio_type)
-    elif args.part == "dev":
+    elif args.part in ["dev", "test"]:
         run_dev(args.meta,
                 args.audios,
                 args.output,
@@ -269,7 +269,7 @@ def main():
                 kmeans,
                 args.audio_type)
     else:
-        print("Part name is wrong, should be train or dev.")
+        print("Part name is wrong, should be train, dev or test.")
 
 
 if __name__ == "__main__":
