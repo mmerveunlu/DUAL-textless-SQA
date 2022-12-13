@@ -49,7 +49,8 @@ logger = logging.getLogger(__name__)
 def get_length(audio):
     """returns the length of the audio in seconds"""
     sound = AudioSegment.from_file(audio)
-    return round((sound.duration_seconds % 60), 3)
+    # return round((sound.duration_seconds % 60), 3)
+    return sound.duration_seconds
 
 
 def create_text_files(data, output):
