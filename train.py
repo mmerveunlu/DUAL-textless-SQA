@@ -7,7 +7,8 @@ The dataframe contains hash, text, utterance, start,end,
 For more detail on generating the input files, please check README.md file. 
 The context features must be paragraphs based and stored in a folder named [part]_passage_code.
 The question features must be stored in a folder named [part]_question_code
-
+Usage:
+> python train.py  --config baseline.yaml
 """
 import argparse
 import json
