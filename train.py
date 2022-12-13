@@ -1,4 +1,12 @@
 """
+This scripts trains a QA model using Spoken QA dataset.
+The dataset folder must contain a dataframe and extracted features.
+The dataframe contains hash, text, utterance, start,end,
+                        context_segment_id,context_id,
+                        new_start,new_end,new_utterance columns. 
+For more detail on generating the input files, please check README.md file. 
+The context features must be paragraphs based and stored in a folder named [part]_passage_code.
+The question features must be stored in a folder named [part]_question_code
 
 """
 import argparse
@@ -24,6 +32,12 @@ from transformers import (
 from tqdm import tqdm
 from typing import Optional
 
+FORMAT = "%(asctime)s - %(name)s - %(levelname)s -[%(filename)s:%(lineno)s - %(funcName)20s() ]- %(message)s"
+logging.basicConfig(filename='log/data.log',
+                    level=logging.INFO,
+                    format=FORMAT,
+                    datefmt='%m/%d/%Y %I:%M:%S %p')
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,20 +49,21 @@ class SQADataset(Dataset):
         :param mode, str, the name of the part
         :param idx_offset, int, offset between tokens
         """
-        df = pd.read_csv(os.path.join(data_dir, mode, mode + '_code_answer.csv'))
-        with open(os.path.join(data_dir, mode, mode + '-hash2question.json')) as f:
+        df = pd.read_csv(os.path.join(data_dir, mode, mode + '_final.csv'))
+        with open(os.path.join(data_dir, mode, 'hash2question.json')) as f:
             h2q = json.load(f)
 
         # adding question column to df using hash info
         df['question'] = df['hash'].apply(lambda x: h2q[x])
 
         code_dir = os.path.join(data_dir, mode, mode + "_code")
+        q_code_dir = os.path.join(data_dir, mode, mode + "_question_code")
 
         self.encodings = []
         # for each row in the dataframe, it generates encoding
         for index, row in tqdm(df.iterrows()):
             context = np.loadtxt(os.path.join(code_dir, 'context-' + row['context_id'] + '.code')).astype(int)
-            question = np.loadtxt(os.path.join(code_dir, row['question'] + '.code')).astype(int)
+            question = np.loadtxt(os.path.join(q_code_dir, row['question'] + '.code')).astype(int)
             if context.shape == ():
                 context = np.expand_dims(context, axis=-1)
             if question.shape == ():
@@ -152,9 +167,6 @@ class DataTrainingArguments:
 
 def main():
     """
-
-    Returns:
-
     """
     # See all possible arguments in src/transformers/training_args.py
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
@@ -212,12 +224,12 @@ def main():
     #     print('train from scratch!')
     #     model.init_weights()
     # Get datasets
-    print('[INFO]    loading data')
+    logger.info('Loading data')
 
     train_dataset = SQADataset(data_dir, mode='train')
     dev_dataset = SQADataset(data_dir, mode='dev')
 
-    print('[INFO]    loading done')
+    logger.info('Loading done')
 
     # Initialize our Trainer
     trainer = Trainer(
@@ -228,21 +240,23 @@ def main():
         data_collator=collate_batch,
     )
     # Training
+    logger.info("Training started")
     if training_args.do_train:
         trainer.train(
             model_path=model_args.model_name_or_path if os.path.isdir(model_args.model_name_or_path) else None
         )
         trainer.save_model()
+    logger.info("Training is done")
     # Evaluation
     results = {}
     if training_args.do_eval and training_args.local_rank in [-1, 0]:
-        logger.info("*** Evaluate ***")
+        logger.info("Evaluation during training ")
 
         eval_output = trainer.evaluate()
 
         output_eval_file = os.path.join(training_args.output_dir, "eval_results.txt")
         with open(output_eval_file, "w") as writer:
-            logger.info("***** Eval results *****")
+            logger.info("Eval results during training")
             for key in sorted(eval_output.keys()):
                 logger.info("  %s = %s", key, str(eval_output[key]))
                 writer.write("%s = %s\n" % (key, str(eval_output[key])))
@@ -255,7 +269,6 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default='baseline.yaml', type=str)
-    parser.add_argument('--exp_name', default='test', type=str)
 
     args = parser.parse_args()
     config = yaml.load(open(args.config, 'r'), Loader=yaml.FullLoader)
@@ -263,7 +276,7 @@ if __name__ == '__main__':
     with open('args.json', 'w') as f:
         json.dump(config['Trainer'], f)
 
-    print('[INFO]    Using config {}'.format(args.config))
+    logger.info('Using config %s', args.config)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     data_dir = config['data']['data_dir']
