@@ -1,6 +1,6 @@
 """
 This script merges the context codes/cnt files into one.
-The codes and cnt files should be generated previously using S2U_train_dev.py of S2U_text.py scripts.
+The codes and cnt files should be generated previously using extract_features.py script.
 Args:
     segment: str, the path of the segment id dictionary
        Its keys are the context ids, and values are the part ids.

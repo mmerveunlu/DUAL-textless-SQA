@@ -12,7 +12,7 @@ Args:
     audio_type: str, the extension of audio files as .mp3, .wav
 
 Usage:
- > python S2U_train_dev.py --part train \
+ > python extract_features.py --part train \
                            --hubert hubert_large_ll60k \
                            --kmeans km_100h_c128/km_feat_layer_22 \
                            --meta meta-train.csv --audios audios \
