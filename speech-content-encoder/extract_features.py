@@ -28,10 +28,13 @@ import numpy as np
 import pandas as pd
 import torch
 import torchaudio
+from torch.nn import functional as F
 from tqdm import tqdm
+
 
 SAMPLE_RATE = 16000
 CHUNK_LENGTH = 250000
+# CHUNK_LENGTH = 200000 # for spoken-squad test
 
 FORMAT = "%(asctime)s - %(name)s - %(levelname)s -[%(filename)s:%(lineno)s - %(funcName)20s() ]- %(message)s"
 logging.basicConfig(filename='../log/data.log',
@@ -138,7 +141,6 @@ def run_train(train_meta,
             code = kmeans(feature.cuda())
             # continue
         else:
-
             # extract the features for each audio file
             feature = extractor([wavs])
 
@@ -176,39 +178,42 @@ def run_dev(dev_meta,
     if torch.cuda.is_available():
         # load the extractor
         extractor = extractor.cuda()
+    with torch.no_grad():
+        for file in tqdm(df['id'].values, desc='transforming passage to discrete code'):
+            audio_file = os.path.join(audio_file_dir, file + "." + audio_type)
+            wavs = reader(audio_file)
+            wavs = wavs.cuda()
 
-    for file in tqdm(df['id'].values, desc='transforming passage to discrete code'):
-        audio_file = os.path.join(audio_file_dir, file + "." + audio_type)
-        wavs = reader(audio_file)
-        wavs = wavs.cuda()
+            if len(wavs) > 20 * SAMPLE_RATE:
+                print(f'{file} too long')
+                chunks = torch.split(wavs, CHUNK_LENGTH)
+                del wavs
+                torch.cuda.empty_cache()
+                for i, chunk in enumerate(chunks):
+                    chunk = F.pad(chunk, (1, 1000), "constant", 0)
+                    feat = extractor([chunk])
+                    feat = feat['hidden_state_22'].squeeze()
 
-        if len(wavs) > 20 * SAMPLE_RATE:
-            print(f'{file} too long')
-            chunks = torch.split(wavs, CHUNK_LENGTH)
-            for i, chunk in enumerate(chunks):
-                feat = extractor([chunk])
-                feat = feat['hidden_state_22'].squeeze()
+                    if i == 0:
+                        feature = feat
+                    else:
+                        feature = torch.cat([feature, feat], dim=0)
 
-                if i == 0:
-                    feature = feat
-                else:
-                    feature = torch.cat([feature, feat], dim=0)
+                code = kmeans(feature.cuda())
 
-            code = kmeans(feature.cuda())
+            else:
+                feature = extractor([wavs])
 
-        else:
-            feature = extractor([wavs])
+                code = kmeans(feature['hidden_state_22'].squeeze().cuda())
 
-            code = kmeans(feature['hidden_state_22'].squeeze().cuda())
+            code = torch.tensor(code)
 
-        code = torch.tensor(code)
-
-        merged_code, counts = torch.unique_consecutive(code, return_counts=True)
-        np.savetxt(os.path.join(output_dir, file + '.code'), merged_code.long(), fmt='%i')
-        np.savetxt(os.path.join(output_dir, file + '.cnt'), counts.long(), fmt='%i')
-        ind += 1
-        if ind % 100 == 0:
-            logger.info("Feature extracted for %d examples ", ind)
+            merged_code, counts = torch.unique_consecutive(code, return_counts=True)
+            np.savetxt(os.path.join(output_dir, file + '.code'), merged_code.long(), fmt='%i')
+            np.savetxt(os.path.join(output_dir, file + '.cnt'), counts.long(), fmt='%i')
+            ind += 1
+            if ind % 100 == 0:
+                logger.info("Feature extracted for %d examples ", ind)
     logger.info("Feature extraction is done for dev set, file %s", dev_meta)
 
 
