@@ -57,7 +57,7 @@ class SQADataset(Dataset):
         # adding question column to df using hash info
         df['question'] = df['hash'].apply(lambda x: h2q[x])
 
-        code_dir = os.path.join(data_dir, mode, mode + "_code")
+        code_dir = os.path.join(data_dir, mode, mode + "_passage_code")
         q_code_dir = os.path.join(data_dir, mode, mode + "_question_code")
 
         self.encodings = []
