@@ -23,7 +23,7 @@ def save_meta_csv(dt, out_file):
     logger.info("Resulting file saved into %s " % out_file)
 
 
-def create_meta_files(tsv_data, meta_all_train, main_hash2question,  output_folder):
+def create_meta_files(tsv_data, meta_all_train, main_hash2question, output_folder):
     """
     Returns
 
@@ -72,9 +72,35 @@ def create_meta_files(tsv_data, meta_all_train, main_hash2question,  output_fold
 
     # create lab files for each audio
     for i, row in meta_train.iterrows():
-        with open(os.path.join(output_folder, "lab_files",  row['id'] + ".lab"), "w+") as fp:
+        with open(os.path.join(output_folder, "lab_files", row['id'] + ".lab"), "w+") as fp:
             fp.writelines(row['text'])
     logger.info("Lab-text files are saved: %s" % output_folder)
+
+
+def create_code_answer(main_answer_file, output_folder):
+    """
+    It creates code_answer.csv file which contains answer start/end positions.
+    It uses the original csv file and select a subset using hash-question file.
+    Returns:
+        :param main_answer_file, str, the path of the main answer code csv file
+        :param output_folder, str, the path of the output contents
+    """
+    original_file = pd.read_csv(main_answer_file)
+    # get hash
+    with open(os.path.join(output_folder, "hash2question.json"), "w+") as fp:
+        hash2question = json.load(fp)
+    # get the examples in hash dict
+    train_code_answer_part = original_file[original_file.hash.isin(hash2question.keys())]
+
+    train_code_answer_part = train_code_answer_part.drop(['Unnamed: 0'], axis=1)
+    train_code_answer_part = train_code_answer_part.reset_index()
+    train_code_answer_part.drop(['index'], axis=1, inplace=True)
+    # save the resulting file
+    train_code_answer_part.to_csv(os.path.join(output_folder, "code_answer_span.csv"),
+                                  sep=",",
+                                  header=True,
+                                  index=False)
+    return
 
 
 def parse_args():
@@ -86,6 +112,8 @@ def parse_args():
     parser.add_argument('--meta_file',
                         help='meta file contains all meta info',
                         required=True)
+    parser.add_argument('--answer_file',
+                        help='answer file contains final answer info')
     parser.add_argument('--hash_file',
                         help='hash file contains all hash-question info',
                         required=True)
@@ -103,7 +131,10 @@ def main():
     data_tsv = pd.read_csv(args.input, sep="\t")
     main_meta_all = pd.read_csv(args.meta_file)
     create_meta_files(data_tsv, main_meta_all, args.hash_file, args.output)
+    if args.answer_file:
+        create_code_answer(args.answer_file, args.output)
     return
+
 
 if __name__ == "__main__":
     main()
