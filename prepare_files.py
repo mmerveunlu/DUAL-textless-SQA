@@ -120,11 +120,9 @@ def parse_args():
     """ Argument parser"""
     parser = argparse.ArgumentParser(description='Generate meta-file for given tsv file')
     parser.add_argument('--input',
-                        help='input tsv/json file name',
-                        required=True)
+                        help='input tsv/json file name')
     parser.add_argument('--meta_file',
-                        help='meta file contains all meta info',
-                        required=True)
+                        help='meta file contains all meta info')
     parser.add_argument('--answer_file',
                         help='answer file contains final answer info')
     parser.add_argument('--hash_file',
