@@ -77,29 +77,42 @@ def create_meta_files(tsv_data, meta_all_train, main_hash2question, output_folde
     logger.info("Lab-text files are saved: %s" % output_folder)
 
 
-def create_code_answer(main_answer_file, output_folder):
+def create_answer_code_file(answer_code_all, tsv_file, output_file):
     """
-    It creates code_answer.csv file which contains answer start/end positions.
-    It uses the original csv file and select a subset using hash-question file.
+    It creates a csv file that contains a subset from all data using tsv file.
+    This file is used directly in train function.
+    Args:
+    :param answer_code_all, str, the path of the file for all data
+    :param tsv_file, str, the path of the file that contains subset data
+    :param output_file, str, the path of the output file
     Returns:
-        :param main_answer_file, str, the path of the main answer code csv file
-        :param output_folder, str, the path of the output contents
+      None
     """
-    original_file = pd.read_csv(main_answer_file)
-    # get hash
-    with open(os.path.join(output_folder, "hash2question.json"), "w+") as fp:
-        hash2question = json.load(fp)
-    # get the examples in hash dict
-    train_code_answer_part = original_file[original_file.hash.isin(hash2question.keys())]
+    answer_all = pd.read_csv(answer_code_all)
+    data_tsv = pd.read_csv(tsv_file, sep="\t")
 
-    train_code_answer_part = train_code_answer_part.drop(['Unnamed: 0'], axis=1)
-    train_code_answer_part = train_code_answer_part.reset_index()
-    train_code_answer_part.drop(['index'], axis=1, inplace=True)
+    # get the part that contains only the question ids
+    train_code_answer_part = answer_all[answer_all.hash.isin(data_tsv.questionid.unique())]
+
+    tsv_dict = data_tsv[['questionid', 'answer_text', 'answer_start', 'answer_end']].to_dict(orient="records")
+    # tsv dict contains question ids and answer text
+    tsv_dict = {k['questionid']: [k['answer_text'], k['answer_start'], k['answer_end']] for k in tsv_dict}
+
+    # now choose the samples with the question id and text same as the tsv_dict
+    # let s think a for loop
+    indx = []
+    for i, row in train_code_answer_part.iterrows():
+        if row['hash'] in tsv_dict.keys():
+            d = tsv_dict[row['hash']]
+            if row['text'] == d[0] and round(row['new_start'], 3) == round(d[1], 3) \
+                    and round(row['new_end'], 3) == round(d[2], 3):
+                indx.append(row[0])
+    sub_train_final = train_code_answer_part[train_code_answer_part.index.isin(indx)]
+    sub_train_final = sub_train_final.drop(['Unnamed: 0'], axis=1)
+    sub_train_final = sub_train_final.reset_index()
+    sub_train_final.drop(['index'], axis=1, inplace=True)
     # save the resulting file
-    train_code_answer_part.to_csv(os.path.join(output_folder, "code_answer_span.csv"),
-                                  sep=",",
-                                  header=True,
-                                  index=False)
+    sub_train_final.to_csv(output_file)
     return
 
 
@@ -115,11 +128,11 @@ def parse_args():
     parser.add_argument('--answer_file',
                         help='answer file contains final answer info')
     parser.add_argument('--hash_file',
-                        help='hash file contains all hash-question info',
-                        required=True)
+                        help='hash file contains all hash-question info')
+    parser.add_argument('--tsv_file',
+                        help='tsv file contains subset data')
     parser.add_argument('--output',
-                        help='str, output folder',
-                        required=True)
+                        help='str, output folder')
 
     args = parser.parse_args()
     return args
@@ -127,12 +140,14 @@ def parse_args():
 
 def main():
     args = parse_args()
-    logger.info("Starting the script using input file %s" % args.input)
-    data_tsv = pd.read_csv(args.input, sep="\t")
-    main_meta_all = pd.read_csv(args.meta_file)
-    create_meta_files(data_tsv, main_meta_all, args.hash_file, args.output)
+    if args.meta_file:
+        logger.info("Starting the script using input file %s" % args.input)
+        data_tsv = pd.read_csv(args.input, sep="\t")
+        main_meta_all = pd.read_csv(args.meta_file)
+        create_meta_files(data_tsv, main_meta_all, args.hash_file, args.output)
     if args.answer_file:
-        create_code_answer(args.answer_file, args.output)
+        logger.info("Starting to create sub-answer file")
+        create_answer_code_file(args.answer_file, args.tsv_file, args.output_file)
     return
 
 
