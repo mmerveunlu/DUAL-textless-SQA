@@ -145,7 +145,7 @@ def main():
         create_meta_files(data_tsv, main_meta_all, args.hash_file, args.output)
     if args.answer_file:
         logger.info("Starting to create sub-answer file")
-        create_answer_code_file(args.answer_file, args.tsv_file, args.output_file)
+        create_answer_code_file(args.answer_file, args.tsv_file, args.output)
     return
 
 
