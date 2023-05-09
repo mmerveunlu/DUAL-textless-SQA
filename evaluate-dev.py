@@ -361,7 +361,7 @@ def run_dev_eval(model_path, batch_size, data_dir, output_dir):
     print('post-processed f1 sec: ', agg_dev_Frame_F1_score_after_sec)
     print('post-processed aos sec: ', agg_dev_AOSs)
 
-    with open(os.path.join(output_dir, 'timings.txt', 'w')) as f:
+    with open(os.path.join(output_dir, 'timings.txt'),'w') as f:
         f.write('post-processed f1 sec: ' + str(agg_dev_Frame_F1_score_after_sec))
         f.write('post-processed aos sec: ' + str(agg_dev_AOSs))
 
