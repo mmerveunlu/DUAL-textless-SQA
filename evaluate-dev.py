@@ -125,8 +125,10 @@ class SQADevDataset(Dataset):
         Args:
             data_dir:
         """
-        df = pd.read_csv(os.path.join(data_dir, 'dev_code_answer.csv'))
-        with open(os.path.join(data_dir, 'dataset/NMSQA/dev-hash2question.json')) as f:
+
+        mode = "dev"
+        df = pd.read_csv(os.path.join(data_dir, mode, mode + '_final.csv'))
+        with open(os.path.join(data_dir, mode, 'hash2question.json')) as f:
             h2q = json.load(f)
 
         df['question'] = df['hash'].apply(lambda x: h2q[x])
@@ -134,8 +136,9 @@ class SQADevDataset(Dataset):
         # TODO: get these from params
         # code_dir = os.path.join(data_dir, 'dev-hubert-128-22')
         # code_passage_dir = os.path.join(data_dir, 'dev-hubert-128-22')
-        code_dir = os.path.join(data_dir, "dev_code")
-        code_passage_dir = os.path.join(data_dir, "dev_passage_code")
+        code_dir = os.path.join(data_dir, mode, mode + "_passage_code")
+        q_code_dir = os.path.join(data_dir, mode, mode + "_question_code")
+
         context_id = df['context_id'].values
         question = df['question'].values
         code_start = df['code_start'].values
@@ -143,9 +146,9 @@ class SQADevDataset(Dataset):
 
         self.encodings = []
         for context_id, question_id, start_idx, end_idx in tqdm(zip(context_id, question, code_start, code_end)):
-            context = np.loadtxt(os.path.join(code_passage_dir, 'context-' + context_id + '.code')).astype(int)
-            question = np.loadtxt(os.path.join(code_dir, question_id + '.code')).astype(int)
-            context_cnt = np.loadtxt(os.path.join(code_passage_dir, 'context-' + context_id + '.cnt')).astype(int)
+            context = np.loadtxt(os.path.join(code_dir, 'context-' + context_id + '.code')).astype(int)
+            question = np.loadtxt(os.path.join(q_code_dir, question_id + '.code')).astype(int)
+            context_cnt = np.loadtxt(os.path.join(code_dir, 'context-' + context_id + '.cnt')).astype(int)
             # question_cnt = np.loadtxt(os.path.join(code_dir, question_id+'.cnt')).astype(int)
             # 0~4 index is the special token, so start from index 5
             # the size of discrete token is 128, indexing from 5~132
@@ -276,12 +279,12 @@ def run_dev_eval(model_path, batch_size, data_dir, output_dir ):
     valid_dataset = SQADevDataset(data_dir)
     dataloader = DataLoader(valid_dataset, batch_size=batch_size, collate_fn=collate_dev_fn, shuffle=False)
 
-    df = pd.read_csv(os.path.join(data_dir, 'dev_code_answer.csv'))
-
-    with open(os.path.join(data_dir, 'hash2question.json'), 'r') as f:
+    mode = "dev"
+    df = pd.read_csv(os.path.join(data_dir, mode, mode + '_final.csv'))
+    with open(os.path.join(data_dir, mode, 'hash2question.json')) as f:
         h2q = json.load(f)
     df['question'] = df['hash'].apply(lambda x: h2q[x])
-    logger.info("Data load")
+    logger.info("Data loaded")
 
     # different answer annotators
     dup = df.duplicated(subset=['hash'], keep='last').values
