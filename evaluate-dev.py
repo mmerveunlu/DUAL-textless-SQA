@@ -247,7 +247,7 @@ def parse_args():
                         required=True)
     parser.add_argument('--model_path',
                         help="directory that contains trained model",
-                        drequired=True)
+                        required=True)
     parser.add_argument('--batch_size',
                         help="batch size during evaluation",
                         type=int,
@@ -259,7 +259,7 @@ def parse_args():
     return args
 
 
-def run_dev_eval(model_path, batch_size, data_dir, output_dir ):
+def run_dev_eval(model_path, batch_size, data_dir, output_dir):
     """
     Runs the evaluation on dev data.
     Args:
@@ -374,3 +374,6 @@ def main():
         os.makedirs(args.output_dir)
     run_dev_eval(args.model_path, args.batch_size, args.data_dir, args.output_dir)
 
+
+if __name__ == '__main__':
+    main()
